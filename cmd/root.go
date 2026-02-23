@@ -8,9 +8,10 @@ import (
 )
 
 var (
-	outputFormat  string
-	confluenceURL string
-	verbose       bool
+	outputFormat   string
+	confluenceURL  string
+	verbose        bool
+	defaultSpaces  string
 )
 
 var rootCmd = &cobra.Command{
@@ -34,4 +35,5 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "markdown", "Output format: markdown, json, text")
 	rootCmd.PersistentFlags().StringVar(&confluenceURL, "url", "https://wiki.sits.no", "Confluence base URL")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show raw HTTP responses from Confluence")
+	rootCmd.PersistentFlags().StringVar(&defaultSpaces, "spaces", os.Getenv("CONFLUENCE_SPACES"), "Comma-separated list of space keys to search (env: CONFLUENCE_SPACES)")
 }

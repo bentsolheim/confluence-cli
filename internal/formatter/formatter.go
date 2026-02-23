@@ -54,11 +54,12 @@ type AgentChild struct {
 
 // AgentSearchHit is a flattened search result item.
 type AgentSearchHit struct {
-	ID       string `json:"id,omitempty"`
-	Title    string `json:"title"`
-	SpaceKey string `json:"spaceKey,omitempty"`
-	Excerpt  string `json:"excerpt,omitempty"`
-	WebURL   string `json:"webUrl"`
+	ID           string `json:"id,omitempty"`
+	Title        string `json:"title"`
+	SpaceKey     string `json:"spaceKey,omitempty"`
+	Excerpt      string `json:"excerpt,omitempty"`
+	LastModified string `json:"lastModified,omitempty"`
+	WebURL       string `json:"webUrl"`
 }
 
 func toAgentPage(page *confluence.Page, baseURL string) AgentPage {
@@ -111,15 +112,49 @@ func toAgentPage(page *confluence.Page, baseURL string) AgentPage {
 
 func toAgentSearchHit(item *confluence.SearchResultItem, baseURL string) AgentSearchHit {
 	hit := AgentSearchHit{
-		Title:   item.Title,
-		Excerpt: strings.TrimSpace(item.Excerpt),
-		WebURL:  baseURL + item.URL,
+		Title:   cleanHighlightMarkers(item.Title),
+		Excerpt: cleanHighlightMarkers(strings.TrimSpace(item.Excerpt)),
 	}
+
+	// CQL content search: data nested in content field
 	if item.Content != nil {
 		hit.ID = item.Content.ID
 		if item.Content.Space != nil {
 			hit.SpaceKey = item.Content.Space.Key
 		}
+		if item.Content.Version != nil && item.Content.Version.When != "" {
+			hit.LastModified = item.Content.Version.When
+		}
 	}
+
+	// siteSearch: data at top level
+	if hit.ID == "" && item.ID != "" {
+		hit.ID = item.ID
+	}
+	if hit.SpaceKey == "" && item.Space != nil {
+		hit.SpaceKey = item.Space.Key
+	}
+
+	// Prefer the friendly date from the search result item
+	if item.FriendlyLastModified != "" {
+		hit.LastModified = item.FriendlyLastModified
+	} else if hit.LastModified == "" && item.LastModified != "" {
+		hit.LastModified = item.LastModified
+	}
+
+	// Build URL: prefer item.URL, fall back to top-level _links.WebUI
+	if item.URL != "" {
+		hit.WebURL = baseURL + item.URL
+	} else if item.Links.WebUI != "" {
+		hit.WebURL = baseURL + item.Links.WebUI
+	}
+
 	return hit
+}
+
+// cleanHighlightMarkers strips Confluence's @@@hl@@@ / @@@endhl@@@ search highlight markers.
+func cleanHighlightMarkers(s string) string {
+	s = strings.ReplaceAll(s, "@@@hl@@@", "")
+	s = strings.ReplaceAll(s, "@@@endhl@@@", "")
+	return s
 }

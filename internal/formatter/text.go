@@ -66,15 +66,15 @@ func (f *TextFormatter) FormatPage(w io.Writer, page *confluence.Page) error {
 func (f *TextFormatter) FormatSearchResult(w io.Writer, result *confluence.SearchResult) error {
 	fmt.Fprintf(w, "Results: %d of %d\n\n", result.Size, result.TotalSize)
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tSPACE\tTITLE\tEXCERPT")
-	fmt.Fprintln(tw, "--\t-----\t-----\t-------")
+	fmt.Fprintln(tw, "ID\tSPACE\tMODIFIED\tTITLE\tEXCERPT")
+	fmt.Fprintln(tw, "--\t-----\t--------\t-----\t-------")
 	for _, item := range result.Results {
 		hit := toAgentSearchHit(&item, f.BaseURL)
 		excerpt := strings.ReplaceAll(hit.Excerpt, "\n", " ")
 		if len(excerpt) > 80 {
 			excerpt = excerpt[:77] + "..."
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", hit.ID, hit.SpaceKey, hit.Title, excerpt)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", hit.ID, hit.SpaceKey, hit.LastModified, hit.Title, excerpt)
 	}
 	return tw.Flush()
 }

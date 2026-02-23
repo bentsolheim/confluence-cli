@@ -53,18 +53,20 @@ func testSearchResult() *confluence.SearchResult {
 		Size:      2,
 		Results: []confluence.SearchResultItem{
 			{
-				Title:   "Result One",
-				Excerpt: "First result excerpt",
-				URL:     "/spaces/DEV/pages/100/Result+One",
+				Title:                "Result One",
+				Excerpt:              "First result excerpt",
+				URL:                  "/spaces/DEV/pages/100/Result+One",
+				FriendlyLastModified: "Feb 06, 2026",
 				Content: &confluence.Page{
 					ID:    "100",
 					Space: &confluence.Space{Key: "DEV"},
 				},
 			},
 			{
-				Title:   "Result Two",
-				Excerpt: "Second result excerpt",
-				URL:     "/spaces/OPS/pages/200/Result+Two",
+				Title:                "Result Two",
+				Excerpt:              "Second result excerpt",
+				URL:                  "/spaces/OPS/pages/200/Result+Two",
+				FriendlyLastModified: "Jan 15, 2026",
 				Content: &confluence.Page{
 					ID:    "200",
 					Space: &confluence.Space{Key: "OPS"},
@@ -194,6 +196,131 @@ func TestToAgentSearchHit_NilContent(t *testing.T) {
 	}
 }
 
+func TestToAgentSearchHit_SiteSearchFallback(t *testing.T) {
+	// siteSearch results have no Content field; ID and space are top-level
+	item := &confluence.SearchResultItem{
+		ID:    "555",
+		Title: "SiteSearch Hit",
+		Space: &confluence.Space{Key: "MUP"},
+		Links: confluence.PageLinks{WebUI: "/spaces/MUP/pages/555/SiteSearch+Hit"},
+	}
+	hit := toAgentSearchHit(item, "https://wiki.example.com")
+	if hit.ID != "555" {
+		t.Errorf("expected ID=555 from top-level, got %q", hit.ID)
+	}
+	if hit.SpaceKey != "MUP" {
+		t.Errorf("expected SpaceKey=MUP from top-level, got %q", hit.SpaceKey)
+	}
+	if hit.WebURL != "https://wiki.example.com/spaces/MUP/pages/555/SiteSearch+Hit" {
+		t.Errorf("expected WebURL from _links.WebUI, got %q", hit.WebURL)
+	}
+}
+
+func TestToAgentSearchHit_ContentTakesPrecedence(t *testing.T) {
+	// When both content and top-level fields exist, content wins
+	item := &confluence.SearchResultItem{
+		ID:    "top-level-id",
+		Title: "Page",
+		URL:   "/spaces/DEV/pages/777/Page",
+		Content: &confluence.Page{
+			ID:    "777",
+			Space: &confluence.Space{Key: "DEV"},
+		},
+		Links: confluence.PageLinks{WebUI: "/fallback"},
+	}
+	hit := toAgentSearchHit(item, "https://wiki.example.com")
+	if hit.ID != "777" {
+		t.Errorf("expected content ID=777 to take precedence, got %q", hit.ID)
+	}
+	if hit.WebURL != "https://wiki.example.com/spaces/DEV/pages/777/Page" {
+		t.Errorf("expected URL from item.URL, got %q", hit.WebURL)
+	}
+}
+
+func TestToAgentSearchHit_StripsHighlightMarkers(t *testing.T) {
+	item := &confluence.SearchResultItem{
+		Title:   "@@@hl@@@Oppsett@@@endhl@@@ av @@@hl@@@runners@@@endhl@@@",
+		Excerpt: "bruk @@@hl@@@av@@@endhl@@@ Harden-@@@hl@@@Runner@@@endhl@@@",
+		URL:     "/spaces/MUP/pages/123/Page",
+		Content: &confluence.Page{ID: "123"},
+	}
+	hit := toAgentSearchHit(item, "https://wiki.example.com")
+	if hit.Title != "Oppsett av runners" {
+		t.Errorf("expected cleaned title, got %q", hit.Title)
+	}
+	if hit.Excerpt != "bruk av Harden-Runner" {
+		t.Errorf("expected cleaned excerpt, got %q", hit.Excerpt)
+	}
+}
+
+func TestToAgentSearchHit_LastModified_FriendlyPreferred(t *testing.T) {
+	item := &confluence.SearchResultItem{
+		Title:                "Page",
+		URL:                  "/spaces/DEV/pages/1/Page",
+		FriendlyLastModified: "Feb 06, 2026",
+		LastModified:         "2026-02-06T13:09:56.000+01:00",
+		Content: &confluence.Page{
+			ID: "1",
+			Version: &confluence.Version{
+				When: "2026-02-06T13:09:56.000+01:00",
+			},
+		},
+	}
+	hit := toAgentSearchHit(item, "https://wiki.example.com")
+	if hit.LastModified != "Feb 06, 2026" {
+		t.Errorf("expected friendly date, got %q", hit.LastModified)
+	}
+}
+
+func TestToAgentSearchHit_LastModified_FallbackToVersionWhen(t *testing.T) {
+	item := &confluence.SearchResultItem{
+		Title: "Page",
+		URL:   "/spaces/DEV/pages/1/Page",
+		Content: &confluence.Page{
+			ID: "1",
+			Version: &confluence.Version{
+				When: "2026-02-06T13:09:56.000+01:00",
+			},
+		},
+	}
+	hit := toAgentSearchHit(item, "https://wiki.example.com")
+	// No friendly date, so falls back to content.version.when
+	if hit.LastModified != "2026-02-06T13:09:56.000+01:00" {
+		t.Errorf("expected version.when fallback, got %q", hit.LastModified)
+	}
+}
+
+func TestToAgentSearchHit_LastModified_FallbackToRaw(t *testing.T) {
+	item := &confluence.SearchResultItem{
+		Title:        "Page",
+		URL:          "/spaces/DEV/pages/1/Page",
+		LastModified: "2026-02-06T13:09:56.000+01:00",
+		Content:      &confluence.Page{ID: "1"},
+	}
+	hit := toAgentSearchHit(item, "https://wiki.example.com")
+	if hit.LastModified != "2026-02-06T13:09:56.000+01:00" {
+		t.Errorf("expected raw lastModified fallback, got %q", hit.LastModified)
+	}
+}
+
+func TestCleanHighlightMarkers(t *testing.T) {
+	tests := []struct {
+		input, want string
+	}{
+		{"no markers here", "no markers here"},
+		{"@@@hl@@@bold@@@endhl@@@", "bold"},
+		{"before @@@hl@@@mid@@@endhl@@@ after", "before mid after"},
+		{"@@@hl@@@a@@@endhl@@@ @@@hl@@@b@@@endhl@@@", "a b"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		got := cleanHighlightMarkers(tt.input)
+		if got != tt.want {
+			t.Errorf("cleanHighlightMarkers(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
 // --- JSONFormatter ---
 
 func TestJSONFormatter_FormatPage(t *testing.T) {
@@ -295,11 +422,30 @@ func TestMarkdownFormatter_FormatSearchResult(t *testing.T) {
 	if !strings.Contains(out, "# Search Results (2 of 42)") {
 		t.Errorf("expected search results header, got %q", out)
 	}
+	if !strings.Contains(out, "Modified") {
+		t.Errorf("expected Modified column header, got %q", out)
+	}
 	if !strings.Contains(out, "Result One") {
 		t.Errorf("expected first result, got %q", out)
 	}
-	if !strings.Contains(out, "| 100 |") {
+	if !strings.Contains(out, "100") {
 		t.Errorf("expected result ID in table, got %q", out)
+	}
+	if !strings.Contains(out, "Feb 06, 2026") {
+		t.Errorf("expected modified date in table, got %q", out)
+	}
+	// Verify columns are consistently padded
+	lines := strings.Split(out, "\n")
+	var tablePipeCount int
+	for _, line := range lines {
+		if strings.HasPrefix(line, "|") {
+			count := strings.Count(line, "|")
+			if tablePipeCount == 0 {
+				tablePipeCount = count
+			} else if count != tablePipeCount {
+				t.Errorf("inconsistent pipe count: expected %d, got %d in line %q", tablePipeCount, count, line)
+			}
+		}
 	}
 }
 

@@ -60,14 +60,51 @@ func (f *MarkdownFormatter) FormatPage(w io.Writer, page *confluence.Page) error
 func (f *MarkdownFormatter) FormatSearchResult(w io.Writer, result *confluence.SearchResult) error {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("# Search Results (%d of %d)\n\n", result.Size, result.TotalSize))
-	b.WriteString("| ID | Space | Title | Excerpt |\n")
-	b.WriteString("|----|-------|-------|---------|\n")
+
+	headers := []string{"ID", "Space", "Modified", "Title", "Excerpt"}
+
+	// Build rows
+	rows := make([][]string, 0, len(result.Results))
 	for _, item := range result.Results {
 		hit := toAgentSearchHit(&item, f.BaseURL)
 		excerpt := strings.ReplaceAll(hit.Excerpt, "\n", " ")
-		b.WriteString(fmt.Sprintf("| %s | %s | [%s](%s) | %s |\n",
-			hit.ID, hit.SpaceKey, hit.Title, hit.WebURL, excerpt))
+		title := fmt.Sprintf("[%s](%s)", hit.Title, hit.WebURL)
+		rows = append(rows, []string{hit.ID, hit.SpaceKey, hit.LastModified, title, excerpt})
 	}
+
+	// Compute max width per column
+	widths := make([]int, len(headers))
+	for i, h := range headers {
+		widths[i] = len(h)
+	}
+	for _, row := range rows {
+		for i, cell := range row {
+			if len(cell) > widths[i] {
+				widths[i] = len(cell)
+			}
+		}
+	}
+
+	// Write header
+	b.WriteString("|")
+	for i, h := range headers {
+		b.WriteString(fmt.Sprintf(" %-*s |", widths[i], h))
+	}
+	b.WriteString("\n|")
+	for _, w := range widths {
+		b.WriteString(strings.Repeat("-", w+2) + "|")
+	}
+	b.WriteString("\n")
+
+	// Write rows
+	for _, row := range rows {
+		b.WriteString("|")
+		for i, cell := range row {
+			b.WriteString(fmt.Sprintf(" %-*s |", widths[i], cell))
+		}
+		b.WriteString("\n")
+	}
+
 	_, err := io.WriteString(w, b.String())
 	return err
 }

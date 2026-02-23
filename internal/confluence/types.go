@@ -88,11 +88,17 @@ type SearchResult struct {
 
 // SearchResultItem represents a single search hit.
 type SearchResultItem struct {
-	Content   *Page  `json:"content"`
-	Title     string `json:"title"`
-	Excerpt   string `json:"excerpt"`
-	URL       string `json:"url"`
+	Content               *Page            `json:"content"`
+	Title                 string           `json:"title"`
+	Excerpt               string           `json:"excerpt"`
+	URL                   string           `json:"url"`
 	ResultGlobalContainer *ResultContainer `json:"resultGlobalContainer"`
+	LastModified          string           `json:"lastModified"`
+	FriendlyLastModified  string           `json:"friendlyLastModified"`
+	// Top-level fields present in siteSearch results (where content is nil)
+	ID    string    `json:"id"`
+	Space *Space    `json:"space"`
+	Links PageLinks `json:"_links"`
 }
 
 // ResultContainer holds space info for a search result.
