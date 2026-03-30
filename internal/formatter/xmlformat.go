@@ -233,15 +233,22 @@ func FormatStorageXML(input string) string {
 			}
 
 		case "text":
-			text := strings.TrimSpace(tok.raw)
-			if text == "" {
+			trimmed := strings.TrimSpace(tok.raw)
+			if trimmed == "" {
 				continue // skip whitespace between block elements
+			}
+			// If raw text contains newlines, it's formatting whitespace from
+			// pre-existing indentation — normalize it. Otherwise preserve
+			// the original (e.g., spaces between inline elements).
+			content := tok.raw
+			if strings.ContainsAny(tok.raw, "\n\r") {
+				content = trimmed
 			}
 			if prevType == "block" {
 				buf.WriteString("\n")
 				writeIndent(&buf, indent)
 			}
-			buf.WriteString(tok.raw)
+			buf.WriteString(content)
 			prevType = "inline"
 		}
 	}

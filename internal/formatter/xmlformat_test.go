@@ -235,3 +235,47 @@ func TestExtractTagName(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatStorageXML_Idempotent(t *testing.T) {
+	// Formatting already-formatted input should produce identical output
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			"paragraph",
+			"<p>\n  Hello <strong>world</strong>\n</p>\n",
+		},
+		{
+			"br",
+			"<p>\n  Line 1<br />\n  Line 2\n</p>\n",
+		},
+		{
+			"table",
+			"<table>\n  <tbody>\n    <tr>\n      <td>text</td>\n    </tr>\n  </tbody>\n</table>\n",
+		},
+		{
+			"macro with CDATA",
+			"<ac:structured-macro ac:name=\"code\">\n  <ac:parameter ac:name=\"language\">go</ac:parameter>\n  <ac:plain-text-body><![CDATA[code here]]></ac:plain-text-body>\n</ac:structured-macro>\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			first := FormatStorageXML(tt.input)
+			second := FormatStorageXML(first)
+			if first != second {
+				t.Errorf("not idempotent.\nFirst pass:\n%s\nSecond pass:\n%s", first, second)
+			}
+		})
+	}
+}
+
+func TestFormatStorageXML_PreservesInlineSpacing(t *testing.T) {
+	// Spaces between inline elements must be preserved
+	input := `<p><strong>bold</strong> and <em>italic</em> text</p>`
+	got := FormatStorageXML(input)
+
+	if !strings.Contains(got, "<strong>bold</strong> and <em>italic</em> text") {
+		t.Errorf("inline spacing was lost, got:\n%s", got)
+	}
+}
