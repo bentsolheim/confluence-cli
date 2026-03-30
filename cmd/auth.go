@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/bentsolheim/confluence-cli/internal/auth"
 	"github.com/bentsolheim/confluence-cli/internal/confluence"
 	"github.com/bentsolheim/confluence-cli/internal/keychain"
 	"github.com/spf13/cobra"
@@ -55,7 +56,7 @@ var authTestCmd = &cobra.Command{
 	Use:   "test",
 	Short: "Verify that the stored PAT works against the Confluence API",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		token, err := keychain.GetPAT(confluenceURL)
+		token, err := auth.ResolveToken(confluenceURL)
 		if err != nil {
 			return err
 		}

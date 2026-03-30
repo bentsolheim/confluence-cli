@@ -14,7 +14,7 @@ type JSONFormatter struct {
 
 func (f *JSONFormatter) FormatPage(w io.Writer, page *confluence.Page) error {
 	ap := toAgentPage(page, f.BaseURL)
-	ap.Body = convertBody(ap.Body)
+	ap.Body = ConvertBody(ap.Body)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(ap)

@@ -79,7 +79,7 @@ func testSearchResult() *confluence.SearchResult {
 // --- New() ---
 
 func TestNew_ValidFormats(t *testing.T) {
-	for _, format := range []string{"json", "markdown", "md", "text"} {
+	for _, format := range []string{"json", "markdown", "md", "storage", "text"} {
 		f, err := New(format, "https://example.com")
 		if err != nil {
 			t.Errorf("New(%q) returned error: %v", format, err)
@@ -382,32 +382,39 @@ func TestMarkdownFormatter_FormatPage(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, "# [Test Page]") {
-		t.Errorf("expected markdown title, got %q", out)
+
+	// Should start with YAML frontmatter
+	if !strings.HasPrefix(out, "---\n") {
+		t.Errorf("expected YAML frontmatter start, got %q", out[:40])
 	}
-	if !strings.Contains(out, "- **ID:** 12345") {
-		t.Errorf("expected ID metadata, got %q", out)
+	if !strings.Contains(out, "confluence:") {
+		t.Errorf("expected 'confluence:' key in frontmatter, got %q", out)
 	}
-	if !strings.Contains(out, "- **Space:** Development (DEV)") {
-		t.Errorf("expected space metadata, got %q", out)
+	if !strings.Contains(out, `pageId: "12345"`) {
+		t.Errorf("expected pageId in frontmatter, got %q", out)
 	}
-	if !strings.Contains(out, "- **Created by:** John Smith") {
-		t.Errorf("expected created by, got %q", out)
+	if !strings.Contains(out, `spaceKey: "DEV"`) {
+		t.Errorf("expected spaceKey in frontmatter, got %q", out)
 	}
-	if !strings.Contains(out, "- **Breadcrumb:** Parent Page → Grandparent Page") {
-		t.Errorf("expected breadcrumb, got %q", out)
+	if !strings.Contains(out, `title: "Test Page"`) {
+		t.Errorf("expected title in frontmatter, got %q", out)
 	}
-	if !strings.Contains(out, "## Child Pages") {
-		t.Errorf("expected child pages section, got %q", out)
+	if !strings.Contains(out, "url: https://wiki.example.com") {
+		t.Errorf("expected url in frontmatter, got %q", out)
 	}
-	if !strings.Contains(out, "- Child A (id: 111)") {
-		t.Errorf("expected child A, got %q", out)
-	}
-	if !strings.Contains(out, "## Content") {
-		t.Errorf("expected content section, got %q", out)
-	}
+
+	// Should contain converted body (no metadata bullets, no ## Content wrapper)
 	if !strings.Contains(out, "**world**") {
 		t.Errorf("expected converted body, got %q", out)
+	}
+	if strings.Contains(out, "## Content") {
+		t.Errorf("should NOT contain ## Content wrapper, got %q", out)
+	}
+	if strings.Contains(out, "- **ID:**") {
+		t.Errorf("should NOT contain metadata bullets, got %q", out)
+	}
+	if strings.Contains(out, "## Child Pages") {
+		t.Errorf("should NOT contain child pages section, got %q", out)
 	}
 }
 
@@ -489,5 +496,53 @@ func TestTextFormatter_FormatSearchResult(t *testing.T) {
 	}
 	if !strings.Contains(out, "Result One") {
 		t.Errorf("expected first result, got %q", out)
+	}
+}
+
+// --- StorageFormatter ---
+
+func TestStorageFormatter_FormatPage(t *testing.T) {
+	var buf bytes.Buffer
+	f := &StorageFormatter{BaseURL: "https://wiki.example.com"}
+	err := f.FormatPage(&buf, testPage())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+
+	// Should have frontmatter with format: storage
+	if !strings.HasPrefix(out, "---\n") {
+		t.Errorf("expected YAML frontmatter start, got %q", out[:40])
+	}
+	if !strings.Contains(out, "format: storage") {
+		t.Errorf("expected format: storage in frontmatter, got %q", out)
+	}
+	if !strings.Contains(out, `pageId: "12345"`) {
+		t.Errorf("expected pageId in frontmatter, got %q", out)
+	}
+	if !strings.Contains(out, `title: "Test Page"`) {
+		t.Errorf("expected title in frontmatter, got %q", out)
+	}
+
+	// Body should be raw storage format, NOT converted to markdown
+	// Content inside <p> is now indented
+	if !strings.Contains(out, "Hello <strong>world</strong>") {
+		t.Errorf("expected raw storage XML body, got %q", out)
+	}
+	// Should NOT contain markdown conversion artifacts
+	if strings.Contains(out, "**world**") {
+		t.Errorf("should NOT contain markdown-converted body, got %q", out)
+	}
+	// Should be formatted (the body ends with newline from FormatStorageXML)
+	if !strings.Contains(out, "format: storage") {
+		t.Errorf("expected format: storage in frontmatter, got %q", out)
+	}
+}
+
+func TestStorageFormatter_FormatSearchResult_ReturnsError(t *testing.T) {
+	f := &StorageFormatter{BaseURL: "https://wiki.example.com"}
+	err := f.FormatSearchResult(&bytes.Buffer{}, testSearchResult())
+	if err == nil {
+		t.Fatal("expected error for storage format search results")
 	}
 }

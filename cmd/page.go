@@ -7,9 +7,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/bentsolheim/confluence-cli/internal/auth"
 	"github.com/bentsolheim/confluence-cli/internal/confluence"
 	"github.com/bentsolheim/confluence-cli/internal/formatter"
-	"github.com/bentsolheim/confluence-cli/internal/keychain"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		input := args[0]
-		token, err := keychain.GetPAT(confluenceURL)
+		token, err := auth.ResolveToken(confluenceURL)
 		if err != nil {
 			return err
 		}

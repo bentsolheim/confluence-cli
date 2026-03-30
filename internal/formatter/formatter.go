@@ -21,10 +21,12 @@ func New(format string, baseURL string) (Formatter, error) {
 		return &JSONFormatter{BaseURL: baseURL}, nil
 	case "markdown", "md":
 		return &MarkdownFormatter{BaseURL: baseURL}, nil
+	case "storage":
+		return &StorageFormatter{BaseURL: baseURL}, nil
 	case "text":
 		return &TextFormatter{BaseURL: baseURL}, nil
 	default:
-		return nil, fmt.Errorf("unknown output format: %q (use json, markdown, or text)", format)
+		return nil, fmt.Errorf("unknown output format: %q (use json, markdown, storage, or text)", format)
 	}
 }
 

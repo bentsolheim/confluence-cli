@@ -52,7 +52,7 @@ func (f *TextFormatter) FormatPage(w io.Writer, page *confluence.Page) error {
 		}
 	}
 
-	body := convertBody(ap.Body)
+	body := ConvertBody(ap.Body)
 	if body != "" {
 		b.WriteString("\nContent:\n")
 		b.WriteString(strings.Repeat("-", 40) + "\n")

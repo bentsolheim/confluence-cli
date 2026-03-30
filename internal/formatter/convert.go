@@ -3,11 +3,14 @@ package formatter
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/base"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/commonmark"
+	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/strikethrough"
+	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/table"
 	"golang.org/x/net/html"
 )
 
@@ -67,6 +70,8 @@ func (p *confluencePlugin) handleMacro(ctx converter.Context, w converter.Writer
 		_, _ = w.WriteString("<!-- Table of Contents -->")
 	case "children":
 		_, _ = w.WriteString("<!-- Child Pages -->")
+	case "jira":
+		_, _ = w.WriteString(handleJiraMacro(n))
 	default:
 		_, _ = w.WriteString(fmt.Sprintf("<!-- Unsupported macro: %s -->", macroName))
 	}
@@ -147,6 +152,23 @@ func (p *confluencePlugin) handleStatusMacro(n *html.Node) string {
 			return fmt.Sprintf("%s **%s**", emoji, title)
 		}
 		return fmt.Sprintf("**[%s]**", title)
+	}
+	return ""
+}
+
+// handleJiraMacro extracts the issue key from a Jira macro and renders it
+// as a plain key reference (e.g. "MUP-1192").
+func handleJiraMacro(n *html.Node) string {
+	key := ""
+	for child := n.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type == html.ElementNode && child.Data == "ac:parameter" {
+			if getAttr(child, "ac:name") == "key" && child.FirstChild != nil {
+				key = child.FirstChild.Data
+			}
+		}
+	}
+	if key != "" {
+		return key
 	}
 	return ""
 }
@@ -362,22 +384,60 @@ func newConfluenceConverter(rawHTML string) *converter.Converter {
 		converter.WithPlugins(
 			base.NewBasePlugin(),
 			commonmark.NewCommonmarkPlugin(),
+			table.NewTablePlugin(),
+			strikethrough.NewStrikethroughPlugin(),
 			&confluencePlugin{rawHTML: rawHTML},
 		),
 	)
 }
 
-// convertBody converts Confluence storage format (HTML/XML) to Markdown.
+// ConvertBody converts Confluence storage format (HTML/XML) to Markdown.
 // If conversion fails, the raw HTML is returned as-is.
-func convertBody(storageHTML string) string {
+func ConvertBody(storageHTML string) string {
 	storageHTML = strings.TrimSpace(storageHTML)
 	if storageHTML == "" {
 		return ""
 	}
+	storageHTML = flattenTableCells(storageHTML)
 	conv := newConfluenceConverter(storageHTML)
 	md, err := conv.ConvertString(storageHTML)
 	if err != nil {
 		return storageHTML
 	}
 	return strings.TrimSpace(md)
+}
+
+// flattenTableCells collapses multiple block elements (e.g. <p>) inside table
+// cells into inline content separated by " / ". Markdown tables cannot contain
+// line breaks, so the html-to-markdown converter gives up on cells with
+// multiple block-level children.
+func flattenTableCells(html string) string {
+	// Match <td ...>content</td> and <th ...>content</th>
+	cellRe := regexp.MustCompile(`(?is)(<t[hd][^>]*>)(.*?)(</t[hd]>)`)
+	return cellRe.ReplaceAllStringFunc(html, func(match string) string {
+		sub := cellRe.FindStringSubmatch(match)
+		if len(sub) != 4 {
+			return match
+		}
+		openTag, inner, closeTag := sub[1], sub[2], sub[3]
+
+		// Only flatten if there are multiple <p> blocks
+		pCount := regexp.MustCompile(`(?i)<p[\s>]`).FindAllStringIndex(inner, -1)
+		if len(pCount) <= 1 {
+			return match
+		}
+
+		// Strip wrapper divs
+		inner = regexp.MustCompile(`(?is)<div[^>]*>`).ReplaceAllString(inner, "")
+		inner = strings.ReplaceAll(inner, "</div>", "")
+
+		// Replace </p><p> boundaries with a separator
+		inner = regexp.MustCompile(`(?is)</p>\s*<p[^>]*>`).ReplaceAllString(inner, " / ")
+		// Remove remaining <p> and </p>
+		inner = regexp.MustCompile(`(?is)<p[^>]*>`).ReplaceAllString(inner, "")
+		inner = strings.ReplaceAll(inner, "</p>", "")
+		inner = strings.TrimSpace(inner)
+
+		return openTag + inner + closeTag
+	})
 }

@@ -5,7 +5,7 @@ import (
 )
 
 func TestBuildTextSearchCQL_NoSpaces(t *testing.T) {
-	got := buildTextSearchCQL("GitHub-pilotering", "")
+	got := buildTextSearchCQL("GitHub-pilotering", "", "")
 	want := `siteSearch ~ "GitHub-pilotering" AND type = page`
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -13,29 +13,45 @@ func TestBuildTextSearchCQL_NoSpaces(t *testing.T) {
 }
 
 func TestBuildTextSearchCQL_SingleSpace(t *testing.T) {
-	got := buildTextSearchCQL("deployment pipeline", "MUP")
+	got := buildTextSearchCQL("deployment pipeline", "MUP", "")
 	if got != `siteSearch ~ "deployment pipeline" AND type = page AND space in ("MUP")` {
 		t.Errorf("got %q", got)
 	}
 }
 
 func TestBuildTextSearchCQL_MultipleSpaces(t *testing.T) {
-	got := buildTextSearchCQL("test", "MUP,DEV,OPS")
+	got := buildTextSearchCQL("test", "MUP,DEV,OPS", "")
 	if got != `siteSearch ~ "test" AND type = page AND space in ("MUP","DEV","OPS")` {
 		t.Errorf("got %q", got)
 	}
 }
 
 func TestBuildTextSearchCQL_SpacesWithWhitespace(t *testing.T) {
-	got := buildTextSearchCQL("test", " MUP , DEV , ")
+	got := buildTextSearchCQL("test", " MUP , DEV , ", "")
 	if got != `siteSearch ~ "test" AND type = page AND space in ("MUP","DEV")` {
 		t.Errorf("got %q", got)
 	}
 }
 
 func TestBuildTextSearchCQL_OnlyWhitespaceSpaces(t *testing.T) {
-	got := buildTextSearchCQL("test", "   ")
+	got := buildTextSearchCQL("test", "   ", "")
 	want := `siteSearch ~ "test" AND type = page`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestBuildTextSearchCQL_WithAncestor(t *testing.T) {
+	got := buildTextSearchCQL("beslutning", "", "997497294")
+	want := `siteSearch ~ "beslutning" AND type = page AND ancestor = 997497294`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestBuildTextSearchCQL_WithAncestorAndSpaces(t *testing.T) {
+	got := buildTextSearchCQL("test", "utp", "997497294")
+	want := `siteSearch ~ "test" AND type = page AND space in ("utp") AND ancestor = 997497294`
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

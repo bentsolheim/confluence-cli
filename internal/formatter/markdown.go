@@ -17,38 +17,20 @@ func (f *MarkdownFormatter) FormatPage(w io.Writer, page *confluence.Page) error
 	ap := toAgentPage(page, f.BaseURL)
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("# [%s](%s)\n\n", ap.Title, ap.WebURL))
-	b.WriteString(fmt.Sprintf("- **ID:** %s\n", ap.ID))
-	b.WriteString(fmt.Sprintf("- **Space:** %s (%s)\n", ap.SpaceName, ap.SpaceKey))
-	b.WriteString(fmt.Sprintf("- **Status:** %s\n", ap.Status))
-	b.WriteString(fmt.Sprintf("- **Version:** %d\n", ap.Version))
-	if ap.CreatedBy != "" {
-		b.WriteString(fmt.Sprintf("- **Created by:** %s\n", ap.CreatedBy))
+	// YAML frontmatter for round-trip publish workflow
+	b.WriteString("---\n")
+	b.WriteString("confluence:\n")
+	b.WriteString(fmt.Sprintf("  url: %s\n", f.BaseURL))
+	b.WriteString(fmt.Sprintf("  pageId: %q\n", ap.ID))
+	if ap.SpaceKey != "" {
+		b.WriteString(fmt.Sprintf("  spaceKey: %q\n", ap.SpaceKey))
 	}
-	if ap.CreatedDate != "" {
-		b.WriteString(fmt.Sprintf("- **Created:** %s\n", ap.CreatedDate))
-	}
-	if ap.UpdatedBy != "" {
-		b.WriteString(fmt.Sprintf("- **Updated by:** %s\n", ap.UpdatedBy))
-	}
-	if ap.UpdatedDate != "" {
-		b.WriteString(fmt.Sprintf("- **Updated:** %s\n", ap.UpdatedDate))
-	}
+	b.WriteString(fmt.Sprintf("  title: %q\n", ap.Title))
+	b.WriteString("---\n")
 
-	if len(ap.Ancestors) > 0 {
-		b.WriteString(fmt.Sprintf("- **Breadcrumb:** %s\n", strings.Join(ap.Ancestors, " → ")))
-	}
-
-	if len(ap.Children) > 0 {
-		b.WriteString("\n## Child Pages\n\n")
-		for _, c := range ap.Children {
-			b.WriteString(fmt.Sprintf("- %s (id: %s)\n", c.Title, c.ID))
-		}
-	}
-
-	body := convertBody(ap.Body)
+	body := ConvertBody(ap.Body)
 	if body != "" {
-		b.WriteString("\n## Content\n\n")
+		b.WriteString("\n")
 		b.WriteString(body)
 		b.WriteString("\n")
 	}
