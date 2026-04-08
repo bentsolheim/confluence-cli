@@ -45,6 +45,7 @@ type AgentPage struct {
 	WebURL      string       `json:"webUrl"`
 	Ancestors   []string     `json:"ancestors,omitempty"`
 	Children    []AgentChild `json:"children,omitempty"`
+	Labels      []string     `json:"labels,omitempty"`
 	Body        string       `json:"body,omitempty"`
 }
 
@@ -109,6 +110,12 @@ func toAgentPage(page *confluence.Page, baseURL string) AgentPage {
 		ap.Body = page.Body.Storage.Value
 	}
 
+	if page.Metadata != nil && page.Metadata.Labels != nil {
+		for _, l := range page.Metadata.Labels.Results {
+			ap.Labels = append(ap.Labels, l.Name)
+		}
+	}
+
 	return ap
 }
 
@@ -159,4 +166,15 @@ func cleanHighlightMarkers(s string) string {
 	s = strings.ReplaceAll(s, "@@@hl@@@", "")
 	s = strings.ReplaceAll(s, "@@@endhl@@@", "")
 	return s
+}
+
+// writeFrontmatterLabels writes the labels field in YAML frontmatter if labels exist.
+func writeFrontmatterLabels(b *strings.Builder, labels []string) {
+	if len(labels) == 0 {
+		return
+	}
+	b.WriteString("  labels:\n")
+	for _, l := range labels {
+		b.WriteString(fmt.Sprintf("    - %s\n", l))
+	}
 }

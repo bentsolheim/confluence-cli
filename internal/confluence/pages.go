@@ -9,7 +9,7 @@ import (
 func (c *Client) GetPage(id string) (*Page, error) {
 	var page Page
 	params := url.Values{}
-	params.Set("expand", "body.storage,version,space,ancestors,children.page,history")
+	params.Set("expand", "body.storage,version,space,ancestors,children.page,history,metadata.labels")
 	path := fmt.Sprintf("/rest/api/content/%s?%s", url.PathEscape(id), params.Encode())
 	if err := c.do("GET", path, &page); err != nil {
 		return nil, err
@@ -22,7 +22,7 @@ func (c *Client) GetPageByTitle(spaceKey, title string) (*Page, error) {
 	params := url.Values{}
 	params.Set("spaceKey", spaceKey)
 	params.Set("title", title)
-	params.Set("expand", "body.storage,version,space,ancestors,children.page,history")
+	params.Set("expand", "body.storage,version,space,ancestors,children.page,history,metadata.labels")
 	path := "/rest/api/content?" + params.Encode()
 
 	var result PageResults

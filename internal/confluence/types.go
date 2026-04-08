@@ -21,6 +21,12 @@ type Page struct {
 	Ancestors []Page         `json:"ancestors"`
 	Children  *PageChildren  `json:"children"`
 	History   *PageHistory   `json:"history"`
+	Metadata  *PageMetadata  `json:"metadata"`
+}
+
+// PageMetadata contains page metadata including labels.
+type PageMetadata struct {
+	Labels *LabelListResponse `json:"labels"`
 }
 
 // Space represents a Confluence space.
@@ -136,12 +142,28 @@ type ImageRef struct {
 
 // PublishConfig represents the Confluence configuration from Markdown frontmatter.
 type PublishConfig struct {
-	URL                  string `yaml:"url"`
-	SpaceKey             string `yaml:"spaceKey,omitempty"`
-	PageID               string `yaml:"pageId,omitempty"`
-	Title                string `yaml:"title"`
-	Format               string `yaml:"format,omitempty"`
-	AssetsBase           string `yaml:"assetsBase,omitempty"`
-	OverwriteAttachments bool   `yaml:"overwriteAttachments,omitempty"`
-	FailOnMissingImages  bool   `yaml:"failOnMissingImages,omitempty"`
+	URL                  string   `yaml:"url"`
+	SpaceKey             string   `yaml:"spaceKey,omitempty"`
+	PageID               string   `yaml:"pageId,omitempty"`
+	Title                string   `yaml:"title"`
+	Format               string   `yaml:"format,omitempty"`
+	Labels               []string `yaml:"labels,omitempty"`
+	AssetsBase           string   `yaml:"assetsBase,omitempty"`
+	OverwriteAttachments bool     `yaml:"overwriteAttachments,omitempty"`
+	FailOnMissingImages  bool     `yaml:"failOnMissingImages,omitempty"`
+}
+
+// Label represents a Confluence content label.
+type Label struct {
+	Prefix string `json:"prefix"`
+	Name   string `json:"name"`
+	ID     string `json:"id,omitempty"`
+}
+
+// LabelListResponse is the response from the label list endpoint.
+type LabelListResponse struct {
+	Results []Label `json:"results"`
+	Start   int     `json:"start"`
+	Limit   int     `json:"limit"`
+	Size    int     `json:"size"`
 }

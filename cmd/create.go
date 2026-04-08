@@ -202,6 +202,15 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintf(os.Stderr, "\n✅ Successfully created!\n")
 	fmt.Fprintf(os.Stderr, "   Page ID: %s\n", pageID)
+
+	// Add labels if specified in frontmatter
+	if len(cfg.Labels) > 0 {
+		if _, err := client.AddLabels(pageID, cfg.Labels); err != nil {
+			return fmt.Errorf("adding labels: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "   Labels: %s\n", strings.Join(cfg.Labels, ", "))
+	}
+
 	fmt.Fprintf(os.Stderr, "\nTip: Add this pageId to your frontmatter for future publish/diff:\n")
 	fmt.Fprintf(os.Stderr, "  confluence:\n")
 	fmt.Fprintf(os.Stderr, "    pageId: \"%s\"\n", pageID)

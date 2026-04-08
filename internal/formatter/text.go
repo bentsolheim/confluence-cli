@@ -45,6 +45,10 @@ func (f *TextFormatter) FormatPage(w io.Writer, page *confluence.Page) error {
 		b.WriteString(fmt.Sprintf("\nBreadcrumb: %s\n", strings.Join(ap.Ancestors, " > ")))
 	}
 
+	if len(ap.Labels) > 0 {
+		b.WriteString(fmt.Sprintf("\nLabels: %s\n", strings.Join(ap.Labels, ", ")))
+	}
+
 	if len(ap.Children) > 0 {
 		b.WriteString("\nChild Pages:\n")
 		for _, c := range ap.Children {

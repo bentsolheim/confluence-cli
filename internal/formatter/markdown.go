@@ -26,6 +26,7 @@ func (f *MarkdownFormatter) FormatPage(w io.Writer, page *confluence.Page) error
 		b.WriteString(fmt.Sprintf("  spaceKey: %q\n", ap.SpaceKey))
 	}
 	b.WriteString(fmt.Sprintf("  title: %q\n", ap.Title))
+	writeFrontmatterLabels(&b, ap.Labels)
 	b.WriteString("---\n")
 
 	body := ConvertBody(ap.Body)

@@ -546,3 +546,126 @@ func TestStorageFormatter_FormatSearchResult_ReturnsError(t *testing.T) {
 		t.Fatal("expected error for storage format search results")
 	}
 }
+
+// --- Label support ---
+
+func testPageWithLabels() *confluence.Page {
+	page := testPage()
+	page.Metadata = &confluence.PageMetadata{
+		Labels: &confluence.LabelListResponse{
+			Results: []confluence.Label{
+				{Prefix: "global", Name: "backend"},
+				{Prefix: "global", Name: "architecture"},
+			},
+		},
+	}
+	return page
+}
+
+func TestToAgentPage_ExtractsLabels(t *testing.T) {
+	ap := toAgentPage(testPageWithLabels(), "https://wiki.example.com")
+	if len(ap.Labels) != 2 {
+		t.Fatalf("expected 2 labels, got %d", len(ap.Labels))
+	}
+	if ap.Labels[0] != "backend" || ap.Labels[1] != "architecture" {
+		t.Errorf("expected [backend, architecture], got %v", ap.Labels)
+	}
+}
+
+func TestToAgentPage_NoLabels(t *testing.T) {
+	ap := toAgentPage(testPage(), "https://wiki.example.com")
+	if len(ap.Labels) != 0 {
+		t.Errorf("expected no labels, got %v", ap.Labels)
+	}
+}
+
+func TestMarkdownFormatter_IncludesLabels(t *testing.T) {
+	var buf bytes.Buffer
+	f := &MarkdownFormatter{BaseURL: "https://wiki.example.com"}
+	if err := f.FormatPage(&buf, testPageWithLabels()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "labels:") {
+		t.Errorf("expected labels in frontmatter, got %q", out)
+	}
+	if !strings.Contains(out, "- backend") {
+		t.Errorf("expected backend label, got %q", out)
+	}
+	if !strings.Contains(out, "- architecture") {
+		t.Errorf("expected architecture label, got %q", out)
+	}
+}
+
+func TestMarkdownFormatter_NoLabelsOmitted(t *testing.T) {
+	var buf bytes.Buffer
+	f := &MarkdownFormatter{BaseURL: "https://wiki.example.com"}
+	if err := f.FormatPage(&buf, testPage()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(buf.String(), "labels:") {
+		t.Errorf("should not contain labels when none exist")
+	}
+}
+
+func TestStorageFormatter_IncludesLabels(t *testing.T) {
+	var buf bytes.Buffer
+	f := &StorageFormatter{BaseURL: "https://wiki.example.com"}
+	if err := f.FormatPage(&buf, testPageWithLabels()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "labels:") {
+		t.Errorf("expected labels in frontmatter, got %q", out)
+	}
+	if !strings.Contains(out, "- backend") {
+		t.Errorf("expected backend label, got %q", out)
+	}
+	// Labels should come before format: storage
+	labelsIdx := strings.Index(out, "labels:")
+	formatIdx := strings.Index(out, "format: storage")
+	if labelsIdx > formatIdx {
+		t.Errorf("labels should appear before format: storage in frontmatter")
+	}
+}
+
+func TestJSONFormatter_IncludesLabels(t *testing.T) {
+	var buf bytes.Buffer
+	f := &JSONFormatter{BaseURL: "https://wiki.example.com"}
+	if err := f.FormatPage(&buf, testPageWithLabels()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var ap AgentPage
+	if err := json.Unmarshal(buf.Bytes(), &ap); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if len(ap.Labels) != 2 {
+		t.Fatalf("expected 2 labels in JSON, got %d", len(ap.Labels))
+	}
+	if ap.Labels[0] != "backend" || ap.Labels[1] != "architecture" {
+		t.Errorf("expected [backend, architecture], got %v", ap.Labels)
+	}
+}
+
+func TestTextFormatter_IncludesLabels(t *testing.T) {
+	var buf bytes.Buffer
+	f := &TextFormatter{BaseURL: "https://wiki.example.com"}
+	if err := f.FormatPage(&buf, testPageWithLabels()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Labels: backend, architecture") {
+		t.Errorf("expected labels line in text output, got %q", out)
+	}
+}
+
+func TestTextFormatter_NoLabelsOmitted(t *testing.T) {
+	var buf bytes.Buffer
+	f := &TextFormatter{BaseURL: "https://wiki.example.com"}
+	if err := f.FormatPage(&buf, testPage()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(buf.String(), "Labels:") {
+		t.Errorf("should not contain Labels line when none exist")
+	}
+}

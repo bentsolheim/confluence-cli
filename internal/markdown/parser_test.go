@@ -44,3 +44,35 @@ func TestParse_MarkdownFormat_ConvertsNormally(t *testing.T) {
 		t.Errorf("expected goldmark-converted HTML, got %q", doc.HTML)
 	}
 }
+
+func TestParse_LabelsFromFrontmatter(t *testing.T) {
+	input := "---\nconfluence:\n  url: https://wiki.example.com\n  pageId: \"123\"\n  title: \"Test\"\n  labels:\n    - backend\n    - architecture\n---\n\n# Hello"
+
+	p := NewParser()
+	doc, err := p.Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	labels := doc.Frontmatter.Confluence.Labels
+	if len(labels) != 2 {
+		t.Fatalf("expected 2 labels, got %d", len(labels))
+	}
+	if labels[0] != "backend" || labels[1] != "architecture" {
+		t.Errorf("expected [backend, architecture], got %v", labels)
+	}
+}
+
+func TestParse_NoLabels(t *testing.T) {
+	input := "---\nconfluence:\n  url: https://wiki.example.com\n  pageId: \"123\"\n  title: \"Test\"\n---\n\n# Hello"
+
+	p := NewParser()
+	doc, err := p.Parse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(doc.Frontmatter.Confluence.Labels) != 0 {
+		t.Errorf("expected no labels, got %v", doc.Frontmatter.Confluence.Labels)
+	}
+}

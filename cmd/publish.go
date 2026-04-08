@@ -147,6 +147,14 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("updating page: %w", err)
 	}
 
+	// Sync labels if specified in frontmatter
+	if len(cfg.Labels) > 0 {
+		if _, err := client.AddLabels(cfg.PageID, cfg.Labels); err != nil {
+			return fmt.Errorf("syncing labels: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "   Labels: %s\n", strings.Join(cfg.Labels, ", "))
+	}
+
 	fmt.Fprintf(os.Stderr, "✅ Published successfully (version %d)\n", currentVersion+1)
 	return nil
 }
