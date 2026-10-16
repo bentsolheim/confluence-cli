@@ -279,3 +279,76 @@ func TestFormatStorageXML_PreservesInlineSpacing(t *testing.T) {
 		t.Errorf("inline spacing was lost, got:\n%s", got)
 	}
 }
+
+func TestFormatStorageXML_PreservesSpaceAroundInlineInFormattedInput(t *testing.T) {
+	// A page published from a formatted file is stored by Confluence with the
+	// formatting newlines inside <p>. Fetching it again must not drop the
+	// spaces between the text and the inline elements.
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			"space before link",
+			"<p>\n  Rollene beskrives på <a href=\"x\">lenken</a>.\n</p>",
+			"<p>\n  Rollene beskrives på <a href=\"x\">lenken</a>.\n</p>\n",
+		},
+		{
+			"space after link",
+			"<p>\n  Se <a href=\"x\">lenken</a> for mer\n</p>",
+			"<p>\n  Se <a href=\"x\">lenken</a> for mer\n</p>\n",
+		},
+		{
+			"newline before inline element",
+			"<p>\n  Se\n  <strong>dette</strong>\n</p>",
+			"<p>\n  Se <strong>dette</strong>\n</p>\n",
+		},
+		{
+			"newline after inline element",
+			"<p>\n  <strong>Dette</strong>\n  er viktig\n</p>",
+			"<p>\n  <strong>Dette</strong> er viktig\n</p>\n",
+		},
+		{
+			"space between two inline elements",
+			"<p><strong>bold</strong> <em>italic</em></p>",
+			"<p>\n  <strong>bold</strong> <em>italic</em>\n</p>\n",
+		},
+		{
+			"newline between two links",
+			"<p>\n  <a href=\"x\">A</a>\n  <a href=\"y\">B</a>\n</p>",
+			"<p>\n  <a href=\"x\">A</a> <a href=\"y\">B</a>\n</p>\n",
+		},
+		{
+			"leading whitespace in table cell is not significant",
+			"<td>\n  <strong>x</strong>\n</td>",
+			"<td><strong>x</strong></td>\n",
+		},
+		{
+			"non-breaking space is kept",
+			"<td>\u00a0</td>",
+			"<td>\u00a0</td>\n",
+		},
+		{
+			"macro used inline in a paragraph",
+			"<p>Se <ac:structured-macro ac:name=\"jira\"><ac:parameter ac:name=\"key\">GSM-1</ac:parameter></ac:structured-macro> for mer.</p>",
+			"<p>\n  Se\n  <ac:structured-macro ac:name=\"jira\">\n    <ac:parameter ac:name=\"key\">GSM-1</ac:parameter>\n  </ac:structured-macro>\n  for mer.\n</p>\n",
+		},
+		{
+			"space before a line break",
+			"<p>Linje 1 <br />Linje 2</p>",
+			"<p>\n  Linje 1<br />\n  Linje 2\n</p>\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FormatStorageXML(tt.input)
+			if got != tt.want {
+				t.Errorf("mismatch.\nGot:\n%q\nWant:\n%q", got, tt.want)
+			}
+			if again := FormatStorageXML(got); again != got {
+				t.Errorf("not idempotent.\nFirst pass:\n%q\nSecond pass:\n%q", got, again)
+			}
+		})
+	}
+}

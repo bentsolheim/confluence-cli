@@ -95,7 +95,7 @@ func tokenize(input string) []xmlToken {
 func nextIsBlock(tokens []xmlToken, from int) bool {
 	for i := from; i < len(tokens); i++ {
 		t := tokens[i]
-		if t.tokType == "text" && strings.TrimSpace(t.raw) == "" {
+		if t.tokType == "text" && strings.TrimFunc(t.raw, isFormatSpace) == "" {
 			continue
 		}
 		if t.tokType == "cdata" || t.tokType == "text" {
@@ -104,6 +104,58 @@ func nextIsBlock(tokens []xmlToken, from int) bool {
 		return blockElements[t.name]
 	}
 	return true
+}
+
+// isFormatSpace reports whether r is whitespace the formatter may rewrite.
+// Non-breaking spaces are content, not formatting, so they are left alone.
+func isFormatSpace(r rune) bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
+}
+
+// isBoundary reports whether whitespace next to the token is insignificant:
+// block elements, line breaks and comments, where the formatter writes its own
+// newlines and indentation.
+func isBoundary(t xmlToken) bool {
+	switch t.tokType {
+	case "comment":
+		return true
+	case "open", "close", "self-close":
+		return blockElements[t.name] || lineBreakElems[t.name]
+	}
+	return false
+}
+
+// normalizeEdge rewrites the whitespace at one end of a text token. Next to a
+// boundary it is dropped: the formatter writes its own newline there, which
+// also renders as a space when the boundary is a macro used inline, like a
+// Jira or status macro. Next to an inline element, whitespace with newlines is
+// collapsed to a single space, and whitespace without newlines is kept as it
+// is, since it separates words in the rendered page.
+func normalizeEdge(ws string, boundary bool) string {
+	if ws == "" || boundary {
+		return ""
+	}
+	if strings.ContainsAny(ws, "\n\r") {
+		return " "
+	}
+	return ws
+}
+
+// normalizeText rewrites the formatting whitespace in a text token, given
+// whether the tokens before and after it are boundaries.
+func normalizeText(raw string, afterBoundary, beforeBoundary bool) string {
+	left := strings.TrimLeftFunc(raw, isFormatSpace)
+	if left == "" {
+		// Whitespace only. Between two inline elements it separates them.
+		if afterBoundary || beforeBoundary {
+			return ""
+		}
+		return normalizeEdge(raw, false)
+	}
+	core := strings.TrimRightFunc(left, isFormatSpace)
+	lead := raw[:len(raw)-len(left)]
+	trail := left[len(core):]
+	return normalizeEdge(lead, afterBoundary) + core + normalizeEdge(trail, beforeBoundary)
 }
 
 func writeIndent(buf *strings.Builder, level int) {
@@ -233,16 +285,15 @@ func FormatStorageXML(input string) string {
 			}
 
 		case "text":
-			trimmed := strings.TrimSpace(tok.raw)
-			if trimmed == "" {
+			// Newlines and indentation from an already formatted page are
+			// replaced by the formatter's own, but the whitespace that
+			// separates text from inline elements, like the space before a
+			// link, must survive.
+			afterBoundary := i == 0 || isBoundary(tokens[i-1])
+			beforeBoundary := i == len(tokens)-1 || isBoundary(tokens[i+1])
+			content := normalizeText(tok.raw, afterBoundary, beforeBoundary)
+			if content == "" {
 				continue // skip whitespace between block elements
-			}
-			// If raw text contains newlines, it's formatting whitespace from
-			// pre-existing indentation — normalize it. Otherwise preserve
-			// the original (e.g., spaces between inline elements).
-			content := tok.raw
-			if strings.ContainsAny(tok.raw, "\n\r") {
-				content = trimmed
 			}
 			if prevType == "block" {
 				buf.WriteString("\n")
