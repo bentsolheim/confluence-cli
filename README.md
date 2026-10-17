@@ -16,7 +16,7 @@ A command-line tool for reading and publishing content on your internal Confluen
 - **Create** — Create new pages from Markdown in any space
 - **Diff** — Compare local Markdown against existing Confluence pages
 - **Image upload** — Local images uploaded as attachments with Confluence macros
-- **Layout preservation** — Existing two-column sidebar layouts are preserved on update
+- **Layout preservation** — Existing two-column sidebar layouts are preserved when publishing Markdown. Content in storage format is published as is, with its own layout
 
 ### Auth
 - **macOS Keychain integration** — PAT stored securely, no config files

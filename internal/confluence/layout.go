@@ -21,6 +21,30 @@ func WrapInTwoColumnLayout(mainContent, existingSidebarContent string) string {
 </ac:layout-section></ac:layout>`, mainContent, sidebar)
 }
 
+var layoutStart = regexp.MustCompile(`<ac:layout[\s>]`)
+
+// HasLayout reports whether the content has its own Confluence layout.
+func HasLayout(html string) bool {
+	return layoutStart.MatchString(html)
+}
+
+// PreserveSidebar returns the content to publish over an existing page, and
+// whether it was wrapped. Content without a layout of its own, such as HTML
+// converted from Markdown, is wrapped in the two-column layout of the existing
+// page, so its sidebar is kept. Content that already has a layout, such as a
+// page fetched and edited in storage format, is returned unchanged. Wrapping it
+// would nest the layout in a new one, with the sidebar twice.
+func PreserveSidebar(newContent, existingContent string) (string, bool) {
+	if HasLayout(newContent) {
+		return newContent, false
+	}
+	_, existingSidebar, hasLayout := ExtractLayoutContent(existingContent)
+	if !hasLayout {
+		return newContent, false
+	}
+	return WrapInTwoColumnLayout(newContent, existingSidebar), true
+}
+
 // ExtractLayoutContent extracts main content and sidebar from an existing
 // Confluence page that uses a two-column layout.
 func ExtractLayoutContent(html string) (mainContent, sidebarContent string, hasLayout bool) {

@@ -180,7 +180,8 @@ func (c *Client) CreatePage(spaceKey, title, htmlContent, parentID string) (*Pag
 }
 
 // UpdatePage updates an existing page in Confluence.
-// It preserves any existing two-column sidebar layout.
+// It preserves any existing two-column sidebar layout, unless the new content
+// has a layout of its own, as pages in storage format do.
 func (c *Client) UpdatePage(pageID, title, htmlContent string, currentVersion int) (*Page, error) {
 	// Fetch existing page to check for sidebar layout
 	existingPage, err := c.GetPage(pageID)
@@ -190,12 +191,10 @@ func (c *Client) UpdatePage(pageID, title, htmlContent string, currentVersion in
 
 	finalContent := htmlContent
 	if existingPage.Body != nil && existingPage.Body.Storage != nil {
-		_, existingSidebar, hasLayout := ExtractLayoutContent(existingPage.Body.Storage.Value)
-		if hasLayout {
-			finalContent = WrapInTwoColumnLayout(htmlContent, existingSidebar)
-			if c.verbose {
-				fmt.Fprintf(os.Stderr, "[layout] Preserved existing sidebar content\n")
-			}
+		var wrapped bool
+		finalContent, wrapped = PreserveSidebar(htmlContent, existingPage.Body.Storage.Value)
+		if wrapped && c.verbose {
+			fmt.Fprintf(os.Stderr, "[layout] Preserved existing sidebar content\n")
 		}
 	}
 
