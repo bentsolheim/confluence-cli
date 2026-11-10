@@ -14,19 +14,32 @@ type Formatter interface {
 	FormatSearchResult(w io.Writer, result *confluence.SearchResult) error
 }
 
+// Options holds optional settings for formatters.
+type Options struct {
+	// UserNames maps user keys/usernames to labels shown in @user(...) mentions
+	// (used by the markdown, json and text formats).
+	UserNames map[string]string
+}
+
 // New creates a formatter for the given format name.
-func New(format string, baseURL string) (Formatter, error) {
+func New(format string, baseURL string, opts ...Options) (Formatter, error) {
+	var o Options
+	if len(opts) > 0 {
+		o = opts[0]
+	}
 	switch format {
 	case "json":
-		return &JSONFormatter{BaseURL: baseURL}, nil
+		return &JSONFormatter{BaseURL: baseURL, UserNames: o.UserNames}, nil
 	case "markdown", "md":
-		return &MarkdownFormatter{BaseURL: baseURL}, nil
+		return &MarkdownFormatter{BaseURL: baseURL, UserNames: o.UserNames}, nil
 	case "storage":
 		return &StorageFormatter{BaseURL: baseURL}, nil
 	case "text":
-		return &TextFormatter{BaseURL: baseURL}, nil
+		return &TextFormatter{BaseURL: baseURL, UserNames: o.UserNames}, nil
+	case "view":
+		return &ViewFormatter{BaseURL: baseURL}, nil
 	default:
-		return nil, fmt.Errorf("unknown output format: %q (use json, markdown, storage, or text)", format)
+		return nil, fmt.Errorf("unknown output format: %q (use json, markdown, storage, text, or view)", format)
 	}
 }
 

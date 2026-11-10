@@ -11,7 +11,8 @@ import (
 
 // TextFormatter outputs pages as human-readable plain text.
 type TextFormatter struct {
-	BaseURL string
+	BaseURL   string
+	UserNames map[string]string
 }
 
 func (f *TextFormatter) FormatPage(w io.Writer, page *confluence.Page) error {
@@ -56,7 +57,7 @@ func (f *TextFormatter) FormatPage(w io.Writer, page *confluence.Page) error {
 		}
 	}
 
-	body := ConvertBody(ap.Body)
+	body := ConvertBodyWithUsers(ap.Body, f.UserNames)
 	if body != "" {
 		b.WriteString("\nContent:\n")
 		b.WriteString(strings.Repeat("-", 40) + "\n")

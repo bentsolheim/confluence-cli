@@ -2,7 +2,9 @@ package confluence
 
 // User represents a Confluence user.
 type User struct {
+	Type        string `json:"type,omitempty"`
 	Username    string `json:"username"`
+	UserKey     string `json:"userKey"`
 	DisplayName string `json:"displayName"`
 	Email       string `json:"email"`
 }

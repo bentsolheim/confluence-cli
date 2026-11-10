@@ -9,12 +9,13 @@ import (
 
 // JSONFormatter outputs pages as JSON.
 type JSONFormatter struct {
-	BaseURL string
+	BaseURL   string
+	UserNames map[string]string
 }
 
 func (f *JSONFormatter) FormatPage(w io.Writer, page *confluence.Page) error {
 	ap := toAgentPage(page, f.BaseURL)
-	ap.Body = ConvertBody(ap.Body)
+	ap.Body = ConvertBodyWithUsers(ap.Body, f.UserNames)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	return enc.Encode(ap)

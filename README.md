@@ -10,6 +10,8 @@ A command-line tool for reading and publishing content on your internal Confluen
 - **HTML → Markdown conversion** — Confluence storage format automatically converted to clean Markdown
 - **Agent-friendly output** — Markdown (default), JSON, and plain text formats
 - **Flattened structure** — Output is deliberately simplified for LLM context windows
+- **User lookup** — Resolve user keys (`@user(<userkey>)`) to names, and usernames to user keys
+- **Rendered view & link check** — Fetch the rendered HTML of a page and flag links to pages that do not exist
 
 ### Write
 - **Publish** — Convert Markdown files to Confluence storage format and update existing pages
@@ -71,7 +73,55 @@ confluence page 12345 -o json
 
 # From a full URL
 confluence page https://wiki.sits.no/spaces/DEV/pages/12345/My+Page
+
+# Show @user mentions as names instead of user keys
+confluence page 12345 --resolve-users
+
+# Rendered HTML (body.view), as shown in the browser
+confluence page 12345 -o view
 ```
+
+User mentions are shown as `@user(<userkey>)` by default. With `--resolve-users`,
+each unique user on the page is looked up once and shown as
+`@user(Solheim, Bent Andre / k77319)` in the markdown, json and text formats.
+
+### Look up users
+
+```bash
+# User key → name and username (e.g. from an @user(<userkey>) mention)
+confluence user 1f58644b4d9ba951014dae08fed80006
+
+# Username → user key (e.g. to write <ri:user ri:userkey="..."/> in storage format)
+confluence user k34046
+
+# Several at once, as JSON
+confluence user k77319 k34046 -o json
+```
+
+An argument of 32 hex characters is treated as a user key, anything else as a
+username. Use `--key` or `--username` to override. Output formats are
+`markdown` (table, default), `json` and `text` (`username<TAB>display name<TAB>user key`).
+The command exits with a non-zero status if any user could not be found.
+
+### Check links on a page
+
+```bash
+# List all links in the rendered page and flag links to missing pages
+confluence links 12345
+
+# Only the links to pages that do not exist
+confluence links 12345 --missing-only
+
+# JSON, e.g. for agents
+confluence links 12345 -o json
+```
+
+`links` reads the rendered page (`body.view`). Confluence renders links to pages
+that do not exist (for example an `<ac:link><ri:page ri:content-title="..."/></ac:link>`
+with a misspelled title) as "create page" links, and links into unknown spaces as
+unresolved. These are reported as `MISSING`, and the command exits with a non-zero
+status. Other links are classified as `page`, `attachment`, `user`, `anchor`,
+`internal` or `external`. Use it after `publish` to verify that page links resolve.
 
 ### Search for content
 
@@ -155,6 +205,8 @@ confluence:
 | Markdown | `-o markdown` | Default. Human-readable, LLM context windows |
 | JSON | `-o json` | AI agents, piping to `jq`, programmatic use |
 | Text | `-o text` | Human terminal use |
+| Storage | `-o storage` | Lossless round-trip editing (page only) |
+| View | `-o view` | Rendered HTML as shown in the browser (page only) |
 
 ## Authentication
 
@@ -165,3 +217,6 @@ confluence auth delete   # Remove PAT from Keychain
 ```
 
 The PAT is stored in macOS Keychain under service name `confluence-cli` with the Confluence URL as the account identifier. As a fallback, the `CONFLUENCE_PAT` environment variable is also checked.
+
+All commands, including `user` and `links`, use this token internally and never print it.
+There is no need to extract the PAT and call the REST API with `curl`.

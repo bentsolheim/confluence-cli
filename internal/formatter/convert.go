@@ -19,6 +19,8 @@ type confluencePlugin struct {
 	// rawHTML stores the original storage format string so we can extract
 	// CDATA content via string parsing (the HTML parser collapses whitespace in CDATA).
 	rawHTML string
+	// userNames maps user keys/usernames to display labels for @user mentions.
+	userNames map[string]string
 }
 
 func (p *confluencePlugin) Name() string {
@@ -218,14 +220,19 @@ func (p *confluencePlugin) handleEmoticon(ctx converter.Context, w converter.Wri
 func (p *confluencePlugin) handleLink(ctx converter.Context, w converter.Writer, n *html.Node) converter.RenderStatus {
 	for child := n.FirstChild; child != nil; child = child.NextSibling {
 		if child.Type == html.ElementNode && child.Data == "ri:user" {
-			accountID := getAttr(child, "ri:account-id")
-			userKey := getAttr(child, "ri:userkey")
-			if accountID != "" {
-				_, _ = fmt.Fprintf(w, " @user(%s) ", accountID)
-				return converter.RenderTryNext
+			id := getAttr(child, "ri:account-id")
+			if id == "" {
+				id = getAttr(child, "ri:userkey")
 			}
-			if userKey != "" {
-				_, _ = fmt.Fprintf(w, " @user(%s) ", userKey)
+			if id == "" {
+				id = getAttr(child, "ri:username")
+			}
+			if id != "" {
+				label := id
+				if name, ok := p.userNames[id]; ok && name != "" {
+					label = name
+				}
+				_, _ = fmt.Fprintf(w, " @user(%s) ", label)
 				return converter.RenderTryNext
 			}
 		}
@@ -379,14 +386,14 @@ func extractTextContent(n *html.Node) string {
 // --- Public conversion function ---
 
 // newConfluenceConverter creates an html-to-markdown converter with Confluence plugin.
-func newConfluenceConverter(rawHTML string) *converter.Converter {
+func newConfluenceConverter(rawHTML string, userNames map[string]string) *converter.Converter {
 	return converter.NewConverter(
 		converter.WithPlugins(
 			base.NewBasePlugin(),
 			commonmark.NewCommonmarkPlugin(),
 			table.NewTablePlugin(),
 			strikethrough.NewStrikethroughPlugin(),
-			&confluencePlugin{rawHTML: rawHTML},
+			&confluencePlugin{rawHTML: rawHTML, userNames: userNames},
 		),
 	)
 }
@@ -394,12 +401,19 @@ func newConfluenceConverter(rawHTML string) *converter.Converter {
 // ConvertBody converts Confluence storage format (HTML/XML) to Markdown.
 // If conversion fails, the raw HTML is returned as-is.
 func ConvertBody(storageHTML string) string {
+	return ConvertBodyWithUsers(storageHTML, nil)
+}
+
+// ConvertBodyWithUsers converts storage format to Markdown like ConvertBody,
+// rendering user mentions as @user(<label>) where label is looked up in
+// userNames by user key, username or account ID. Unknown users keep their ID.
+func ConvertBodyWithUsers(storageHTML string, userNames map[string]string) string {
 	storageHTML = strings.TrimSpace(storageHTML)
 	if storageHTML == "" {
 		return ""
 	}
 	storageHTML = flattenTableCells(storageHTML)
-	conv := newConfluenceConverter(storageHTML)
+	conv := newConfluenceConverter(storageHTML, userNames)
 	md, err := conv.ConvertString(storageHTML)
 	if err != nil {
 		return storageHTML

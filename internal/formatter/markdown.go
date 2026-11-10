@@ -10,7 +10,8 @@ import (
 
 // MarkdownFormatter outputs pages as Markdown, suitable for LLM/agent context.
 type MarkdownFormatter struct {
-	BaseURL string
+	BaseURL   string
+	UserNames map[string]string
 }
 
 func (f *MarkdownFormatter) FormatPage(w io.Writer, page *confluence.Page) error {
@@ -29,7 +30,7 @@ func (f *MarkdownFormatter) FormatPage(w io.Writer, page *confluence.Page) error
 	writeFrontmatterLabels(&b, ap.Labels)
 	b.WriteString("---\n")
 
-	body := ConvertBody(ap.Body)
+	body := ConvertBodyWithUsers(ap.Body, f.UserNames)
 	if body != "" {
 		b.WriteString("\n")
 		b.WriteString(body)

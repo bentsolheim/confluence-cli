@@ -3,13 +3,24 @@ package confluence
 import (
 	"fmt"
 	"net/url"
+	"strings"
 )
 
+const defaultPageExpand = "body.storage,version,space,ancestors,children.page,history,metadata.labels"
+
+func pageExpand(extra []string) string {
+	if len(extra) == 0 {
+		return defaultPageExpand
+	}
+	return defaultPageExpand + "," + strings.Join(extra, ",")
+}
+
 // GetPage fetches a single page by ID with expanded content, ancestors, children, and history.
-func (c *Client) GetPage(id string) (*Page, error) {
+// Extra expand values (e.g. "body.view") can be supplied to fetch additional data.
+func (c *Client) GetPage(id string, extraExpand ...string) (*Page, error) {
 	var page Page
 	params := url.Values{}
-	params.Set("expand", "body.storage,version,space,ancestors,children.page,history,metadata.labels")
+	params.Set("expand", pageExpand(extraExpand))
 	path := fmt.Sprintf("/rest/api/content/%s?%s", url.PathEscape(id), params.Encode())
 	if err := c.do("GET", path, &page); err != nil {
 		return nil, err
@@ -18,11 +29,12 @@ func (c *Client) GetPage(id string) (*Page, error) {
 }
 
 // GetPageByTitle fetches a page by space key and title.
-func (c *Client) GetPageByTitle(spaceKey, title string) (*Page, error) {
+// Extra expand values (e.g. "body.view") can be supplied to fetch additional data.
+func (c *Client) GetPageByTitle(spaceKey, title string, extraExpand ...string) (*Page, error) {
 	params := url.Values{}
 	params.Set("spaceKey", spaceKey)
 	params.Set("title", title)
-	params.Set("expand", "body.storage,version,space,ancestors,children.page,history,metadata.labels")
+	params.Set("expand", pageExpand(extraExpand))
 	path := "/rest/api/content?" + params.Encode()
 
 	var result PageResults
